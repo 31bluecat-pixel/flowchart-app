@@ -1,136 +1,131 @@
-set -e
-
-APP_DIR="flowchart-ai-generator"
-
-mkdir -p "$APP_DIR"/{public,src/{components,services,types,styles}}
-
-cat > "$APP_DIR/package.json" <<'JSON'
-{
-  "name": "flowchart-ai-generator",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@google/genai": "^1.37.0",
-    "html-to-image": "^1.11.11",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
-  },
-  "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.11"
-  }
-}
-JSON
-
-cat > "$APP_DIR/vite.config.ts" <<'TS'
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-
-export default defineConfig({
-  plugins: [react()],
-});
-TS
-
-cat > "$APP_DIR/tsconfig.json" <<'JSON'
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    "moduleResolution": "Bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-
-    "strict": true,
-    "types": ["vite/client"]
-  },
-  "include": ["src"]
-}
-JSON
-
-cat > "$APP_DIR/tsconfig.node.json" <<'JSON'
-{
-  "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true
-  },
-  "include": ["vite.config.ts"]
-}
-JSON
-
-cat > "$APP_DIR/index.html" <<'HTML'
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FlowChart AI Generator</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowChart AI Generator</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  </head>
-  <body class="bg-slate-50 min-h-screen">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-HTML
+  <!-- Tailwind（見た目整える） -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-cat > "$APP_DIR/src/styles/index.css" <<'CSS'
-html,
-body {
-  height: 100%;
-}
-CSS
+  <!-- Mermaid（図の描画） -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 
-cat > "$APP_DIR/src/main.tsx" <<'TSX'
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./styles/index.css";
+  <style>
+    /* Mermaidを中央に収めやすくするための補助 */
+    .mermaid svg { max-width: none !important; }
+  </style>
+</head>
 
-const rootElement = document.getElementById("root");
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
+<body class="bg-slate-50 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-8 md:py-12">
+    <header class="mb-10 text-center">
+      <h1 class="text-3xl font-extrabold text-slate-800 flex items-center justify-center gap-2">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white font-black">M</span>
+        FlowChart AI Generator
+      </h1>
+      <p class="mt-2 text-slate-500">文章を貼るだけで、整理された業務フロー図を自動作成</p>
+    </header>
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-TSX
+    <main class="space-y-8">
+      <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <label class="block text-sm font-semibold text-slate-700 mb-2">業務フローの説明</label>
+        <textarea
+          id="inputText"
+          class="w-full h-40 p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none text-slate-800"
+          placeholder="業務フローを自然な日本語で記述してください。
+例: 顧客から問い合わせが来たら、まず内容を確認する。不備があれば差し戻す。問題なければ承認する。"
+        ></textarea>
 
-cat > "$APP_DIR/src/types/index.ts" <<'TS'
-export enum AppStatus {
-  IDLE = "IDLE",
-  LOADING = "LOADING",
-  SUCCESS = "SUCCESS",
-  ERROR = "ERROR",
-}
-TS
+        <div class="mt-3 flex flex-wrap gap-2 items-center justify-between">
+          <div class="flex gap-2">
+            <button id="ex1" class="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors">
+              例: 承認フロー
+            </button>
+            <button id="ex2" class="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors">
+              例: ルーティン
+            </button>
+          </div>
 
-cat > "$APP_DIR/src/services/geminiService.ts" <<'TS'
-import { GoogleGenAI } from "@google/genai";
+          <button
+            id="btnGenerate"
+            class="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed"
+            disabled
+          >
+            図解を生成
+          </button>
+        </div>
 
-const SYSTEM_INSTRUCTION = `
+        <div id="hintApi" class="mt-4 hidden p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-800 rounded">
+          <div class="font-semibold mb-1">APIキーが未設定です</div>
+          <div class="text-sm leading-relaxed">
+            下のコード内の<br />
+            <span class="font-mono bg-white px-1 rounded">const API_KEY = "ここにAPIを入れる";</span><br />
+            の部分を自分のAPIキーに置き換えてください。
+          </div>
+        </div>
+      </section>
+
+      <div id="errorBox" class="hidden p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded shadow-sm"></div>
+
+      <section id="resultSection" class="hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+          <h2 class="text-xl font-bold text-slate-800">生成されたフローチャート</h2>
+          <div class="flex flex-wrap gap-2">
+            <button
+              id="btnDownloadSVG"
+              class="px-5 py-2 text-white font-bold rounded-lg shadow transition-all bg-blue-500 hover:bg-blue-600 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed"
+              disabled
+            >
+              SVG保存
+            </button>
+            <button
+              id="btnDownloadPNG"
+              class="px-5 py-2 text-white font-bold rounded-lg shadow-lg transition-all bg-green-600 hover:bg-green-700 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:shadow-none"
+              disabled
+            >
+              PNG保存
+            </button>
+          </div>
+        </div>
+
+        <div id="chartContainer" class="w-full flex justify-center bg-white p-10 rounded-lg border border-slate-200 shadow-sm overflow-auto min-h-[300px]">
+          <div id="mermaidTarget" class="w-full"></div>
+        </div>
+
+        <details class="mt-6 group border border-slate-200 rounded-lg bg-slate-100 overflow-hidden">
+          <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-200 transition-colors list-none select-none">
+            <span class="text-xs text-slate-500 uppercase tracking-wider font-bold">Mermaidコード</span>
+            <span class="text-slate-400">▼</span>
+          </summary>
+          <div class="p-4 pt-0 border-t border-slate-200">
+            <pre id="codeBox" class="text-[10px] sm:text-xs text-slate-600 overflow-x-auto whitespace-pre-wrap font-mono py-2"></pre>
+          </div>
+        </details>
+
+        <div class="mt-4 text-xs text-slate-500 leading-relaxed">
+          注意：この方式はブラウザにAPIキーを置くため、公開運用には不向きです。まずは動作確認用の試作品として利用してください。
+        </div>
+      </section>
+
+      <div id="idleBox" class="border-2 border-dashed border-slate-200 rounded-xl p-20 text-center text-slate-400">
+        <p>文章を入力して「図解を生成」をクリックしてください</p>
+      </div>
+    </main>
+
+    <footer class="mt-20 text-center text-slate-400 text-sm border-t border-slate-200 pt-8 pb-12">
+      © <span id="year"></span> FlowChart AI Generator | 業務効率化を支援
+    </footer>
+  </div>
+
+<script>
+  // -----------------------------
+  // ここにAPIを入れる（後で置換する）
+  // -----------------------------
+  const API_KEY = "ここにAPIを入れる";
+  // 公開運用は不可（キーが漏れます）。動作確認用。
+
+  const SYSTEM_INSTRUCTION = `
 あなたは業務効率化のスペシャリストおよびMermaid.jsのエキスパートです。
 ユーザーから入力された自然な日本語の業務フロー説明を解析し、正確なMermaid形式のフローチャート（graph TD）を生成してください。
 
@@ -141,161 +136,52 @@ const SYSTEM_INSTRUCTION = `
 4. 開始と終了は明示的に ((開始)) や ((終了)) を使う。
 5. 日本語のニュアンス（〜なら、〜の場合、同時に、等）を論理的に構造化してください。
 6. 背景色やスタイル指定は含めないでください。
-`;
+  `.trim();
 
-/*
-  ここにAPIを入れる
+  // UI要素
+  const elInput = document.getElementById("inputText");
+  const btnGenerate = document.getElementById("btnGenerate");
+  const errorBox = document.getElementById("errorBox");
+  const resultSection = document.getElementById("resultSection");
+  const idleBox = document.getElementById("idleBox");
+  const mermaidTarget = document.getElementById("mermaidTarget");
+  const codeBox = document.getElementById("codeBox");
+  const btnDownloadSVG = document.getElementById("btnDownloadSVG");
+  const btnDownloadPNG = document.getElementById("btnDownloadPNG");
+  const hintApi = document.getElementById("hintApi");
 
-  手順:
-  1) .env.example をコピーして .env を作る
-  2) .env の VITE_GEMINI_API_KEY=ここにAPIを入れる の右側を、自分のAPIキーに置き換える
+  document.getElementById("year").textContent = new Date().getFullYear();
 
-  注意:
-  .env はGitHubに上げない（.gitignore で除外済み）
-*/
-const getApiKey = () => {
-  const key = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-  return key?.trim() || "";
-};
+  // Mermaid初期化（ページ全体）
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "neutral",
+    securityLevel: "loose",
+    fontFamily: "sans-serif",
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
 
-const withRetry = async <T>(
-  fn: () => Promise<T>,
-  retries = 2,
-  delay = 1000
-): Promise<T> => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) throw error;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    return withRetry(fn, retries - 1, delay * 2);
-  }
-};
-
-export const generateFlowChart = async (text: string): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("APIキーが未設定です。.env に VITE_GEMINI_API_KEY を設定してください。");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const generate = async () => {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          parts: [
-            {
-              text: `以下の業務フローをMermaid記法のフローチャートに変換してください：\n\n${text}`,
-            },
-          ],
-        },
-      ],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.1,
-      },
-    });
-
-    return response.text ?? "";
+  const setError = (msg) => {
+    if (!msg) {
+      errorBox.classList.add("hidden");
+      errorBox.textContent = "";
+      return;
+    }
+    errorBox.classList.remove("hidden");
+    errorBox.textContent = msg;
   };
 
-  const output = (await withRetry(generate)) || "";
+  const setReadyForDownload = (ready) => {
+    btnDownloadSVG.disabled = !ready;
+    btnDownloadPNG.disabled = !ready;
+  };
 
-  const mermaidMatch = output.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-  const genericMatch = output.match(/```\s*([\s\S]*?)\s*```/i);
+  const setBusy = (busy) => {
+    btnGenerate.disabled = busy || !elInput.value.trim();
+    btnGenerate.textContent = busy ? "生成中..." : "図解を生成";
+  };
 
-  let code = "";
-  if (mermaidMatch) code = mermaidMatch[1];
-  else if (genericMatch) code = genericMatch[1];
-  else code = output;
-
-  code = code.trim();
-  if (code && !code.startsWith("graph") && !code.startsWith("flowchart")) {
-    code = `graph TD\n${code}`;
-  }
-
-  return code;
-};
-TS
-
-cat > "$APP_DIR/src/components/MermaidRenderer.tsx" <<'TSX'
-import React, { useEffect, useRef } from "react";
-
-declare global {
-  interface Window {
-    mermaid: any;
-  }
-}
-
-interface MermaidRendererProps {
-  chart: string;
-  onRendered?: () => void;
-  onError?: (msg: string) => void;
-}
-
-const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, onRendered, onError }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!ref.current || !chart) return;
-
-    ref.current.innerHTML = `<div class="mermaid-target">${chart}</div>`;
-
-    try {
-      window.mermaid.initialize({
-        startOnLoad: false,
-        theme: "neutral",
-        securityLevel: "loose",
-        fontFamily: "sans-serif",
-        flowchart: { useMaxWidth: false, htmlLabels: true },
-      });
-
-      const targetNode = ref.current.firstChild as HTMLElement;
-
-      window.mermaid
-        .run({ nodes: [targetNode] })
-        .then(() => {
-          if (onRendered) setTimeout(onRendered, 100);
-        })
-        .catch((err: any) => {
-          console.error("Mermaid run error:", err);
-          if (onError) onError("図の描画に失敗しました。構文を確認してください。");
-        });
-    } catch (err) {
-      console.error("Mermaid init error:", err);
-      if (onError) onError("Mermaidの初期化に失敗しました。");
-    }
-  }, [chart, onRendered, onError]);
-
-  return (
-    <div
-      id="chart-container"
-      className="w-full flex justify-center bg-white p-10 rounded-lg border border-slate-200 shadow-sm overflow-auto min-h-[300px]"
-      ref={ref}
-    />
-  );
-};
-
-export default MermaidRenderer;
-TSX
-
-cat > "$APP_DIR/src/App.tsx" <<'TSX'
-import React, { useCallback, useState } from "react";
-import { toPng } from "html-to-image";
-import MermaidRenderer from "./components/MermaidRenderer";
-import { generateFlowChart } from "./services/geminiService";
-import { AppStatus } from "./types";
-
-const App: React.FC = () => {
-  const [inputText, setInputText] = useState("");
-  const [mermaidCode, setMermaidCode] = useState("");
-  const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
-  const [error, setError] = useState<string | null>(null);
-  const [isReadyForDownload, setIsReadyForDownload] = useState(false);
-
-  const formatDate = (date: Date) => {
+  const formatDate = (date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
@@ -304,320 +190,197 @@ const App: React.FC = () => {
     return `${y}${m}${d}_${h}${i}`;
   };
 
-  const handleGenerate = useCallback(async () => {
-    const trimmedInput = inputText.trim();
-    if (!trimmedInput) return;
+  // 入力に応じてボタンを有効化
+  elInput.addEventListener("input", () => {
+    btnGenerate.disabled = !elInput.value.trim();
+  });
 
-    setStatus(AppStatus.LOADING);
+  // 例ボタン
+  document.getElementById("ex1").addEventListener("click", () => {
+    elInput.value = "申請を受け取る。内容を確認する。不備があれば差し戻す。不備がなければ承認する。";
+    btnGenerate.disabled = false;
+  });
+  document.getElementById("ex2").addEventListener("click", () => {
+    elInput.value = "朝起きたら顔を洗う。その後、天気が良ければ洗濯物をする。雨なら部屋干しをする。最後に朝食を食べる。";
+    btnGenerate.disabled = false;
+  });
+
+  // APIキー未設定のガード
+  const apiKeyIsUnset = () => !API_KEY || API_KEY.includes("ここにAPIを入れる");
+
+  // Gemini呼び出し（REST）
+  async function callGemini(promptText) {
+    // Gemini API: generateContent
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(API_KEY)}`;
+
+    const body = {
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      contents: [{ role: "user", parts: [{ text: promptText }] }],
+      generationConfig: { temperature: 0.1 }
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`APIエラー: ${res.status} ${res.statusText} ${t}`);
+    }
+
+    const data = await res.json();
+    const text =
+      data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+    return text;
+  }
+
+  // Mermaidコード抽出
+  function extractMermaid(text) {
+    const mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
+    const genericMatch = text.match(/```\s*([\s\S]*?)\s*```/i);
+
+    let code = "";
+    if (mermaidMatch) code = mermaidMatch[1];
+    else if (genericMatch) code = genericMatch[1];
+    else code = text;
+
+    code = (code || "").trim();
+    if (code && !code.startsWith("graph") && !code.startsWith("flowchart")) {
+      code = `graph TD\n${code}`;
+    }
+    return code;
+  }
+
+  // Mermaid描画
+  async function renderMermaid(code) {
+    mermaidTarget.innerHTML = `<div class="mermaid">${code}</div>`;
+    await mermaid.run({ nodes: [mermaidTarget.querySelector(".mermaid")] });
+  }
+
+  // リトライ（初回失敗対策）
+  async function withRetry(fn, retries = 2, delay = 900) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (retries <= 0) throw e;
+      await new Promise((r) => setTimeout(r, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+  }
+
+  btnGenerate.addEventListener("click", async () => {
     setError(null);
-    setMermaidCode("");
-    setIsReadyForDownload(false);
+    setReadyForDownload(false);
 
-    try {
-      const code = await generateFlowChart(trimmedInput);
-      if (!code || code.length < 5) {
-        throw new Error("図解データの生成に失敗しました。");
-      }
-      setMermaidCode(code);
-      setStatus(AppStatus.SUCCESS);
-    } catch (err: any) {
-      console.error("Generation Error:", err);
-      const msg =
-        err?.message?.includes("APIキー")
-          ? "APIキーが未設定です。.env に VITE_GEMINI_API_KEY を設定してください。"
-          : "図解の生成に失敗しました。もう一度「生成」ボタンを押してみてください。";
-      setError(msg);
-      setStatus(AppStatus.ERROR);
-    }
-  }, [inputText]);
-
-  const handleDownloadPNG = async () => {
-    const target = document.getElementById("chart-container");
-    if (!target) {
-      alert("プレビューエリアが見つかりません。");
+    if (apiKeyIsUnset()) {
+      hintApi.classList.remove("hidden");
+      setError("APIキーが未設定です。");
       return;
     }
+    hintApi.classList.add("hidden");
+
+    const input = elInput.value.trim();
+    if (!input) return;
+
+    setBusy(true);
 
     try {
-      const dataUrl = await toPng(target, {
-        backgroundColor: "#FFFFFF",
-        pixelRatio: 3,
-        quality: 1.0,
-        style: { padding: "20px", margin: "0" },
-      });
+      const prompt = `以下の業務フローをMermaid記法のフローチャートに変換してください：\n\n${input}`;
 
-      const link = document.createElement("a");
-      link.download = `flowchart_${formatDate(new Date())}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err: any) {
-      console.error("PNG conversion failed:", err);
-      alert(`画像の保存に失敗しました: ${err?.message || "不明なエラー"}`);
-    }
-  };
+      const raw = await withRetry(() => callGemini(prompt), 2, 900);
+      const code = extractMermaid(raw);
 
-  const handleDownloadSVG = () => {
-    const target = document.getElementById("chart-container");
-    const svgElement = target?.querySelector("svg");
-    if (!svgElement) {
-      alert("SVG要素が見つかりません。");
-      return;
+      if (!code || code.length < 5) throw new Error("図解データの生成に失敗しました。");
+
+      codeBox.textContent = code;
+
+      await renderMermaid(code);
+
+      // 表示切替
+      idleBox.classList.add("hidden");
+      resultSection.classList.remove("hidden");
+
+      // ダウンロード可
+      setReadyForDownload(true);
+    } catch (e) {
+      console.error(e);
+      setError("図解の生成に失敗しました。もう一度「生成」ボタンを押してみてください。");
+    } finally {
+      setBusy(false);
     }
+  });
+
+  // SVG保存
+  btnDownloadSVG.addEventListener("click", () => {
+    const svg = document.querySelector("#chartContainer svg");
+    if (!svg) return alert("SVG要素が見つかりません。");
+
+    const clone = svg.cloneNode(true);
+
+    if (!clone.getAttribute("xmlns")) clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clone);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `flowchart_${formatDate(new Date())}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // PNG保存（SVG→Canvas変換）
+  btnDownloadPNG.addEventListener("click", async () => {
+    const svg = document.querySelector("#chartContainer svg");
+    if (!svg) return alert("SVG要素が見つかりません。");
 
     try {
-      const svgClone = svgElement.cloneNode(true) as SVGSVGElement;
-      if (!svgClone.getAttribute("xmlns")) svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-      const bbox = svgElement.getBBox();
-      svgClone.setAttribute("viewBox", `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
-      svgClone.setAttribute("width", bbox.width.toString());
-      svgClone.setAttribute("height", bbox.height.toString());
-
-      let cssText = "";
-      try {
-        Array.from(document.styleSheets).forEach((sheet) => {
-          const s = sheet as CSSStyleSheet;
-          if (s.href) return;
-          Array.from(s.cssRules).forEach((rule) => {
-            if (rule.cssText.includes("mermaid")) cssText += rule.cssText;
-          });
-        });
-      } catch {
-        // 取得できない場合は無視
-      }
-
-      const styleTag = document.createElementNS("http://www.w3.org/2000/svg", "style");
-      styleTag.textContent = cssText;
-      svgClone.prepend(styleTag);
-
       const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(svgClone);
+      const svgString = serializer.serializeToString(svg);
       const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(svgBlob);
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `flowchart_${formatDate(new Date())}.svg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      console.error("SVG download failed:", err);
-      alert(`SVGの保存に失敗しました: ${err?.message || "不明なエラー"}`);
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        const scale = 3;
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        const pngUrl = canvas.toDataURL("image/png", 1.0);
+        const a = document.createElement("a");
+        a.href = pngUrl;
+        a.download = `flowchart_${formatDate(new Date())}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(url);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        alert("PNG変換に失敗しました。");
+      };
+
+      img.src = url;
+    } catch (e) {
+      console.error(e);
+      alert("PNGの保存に失敗しました。");
     }
-  };
-
-  const handleExample = (text: string) => setInputText(text);
-
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
-      <header className="mb-10 text-center">
-        <h1 className="text-3xl font-extrabold text-slate-800 flex items-center justify-center gap-2">
-          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
-            />
-          </svg>
-          FlowChart AI Generator
-        </h1>
-        <p className="mt-2 text-slate-500">文章を貼るだけで、整理された業務フロー図を自動作成</p>
-      </header>
-
-      <main className="space-y-8">
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">業務フローの説明</label>
-          <textarea
-            className="w-full h-40 p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none text-slate-800"
-            placeholder={"業務フローを自然な日本語で記述してください。\n例: 顧客から問い合わせが来たら、まず内容を確認する。不備があれば差し戻す。問題なければ承認する。"}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-          />
-
-          <div className="mt-3 flex flex-wrap gap-2 items-center justify-between">
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleExample("申請を受け取る。内容を確認する。不備があれば差し戻す。不備がなければ承認する。")}
-                className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors"
-              >
-                例: 承認フロー
-              </button>
-              <button
-                onClick={() => handleExample("朝起きたら顔を洗う。その後、天気が良ければ洗濯物をする。雨なら部屋干しをする。最後に朝食を食べる。")}
-                className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors"
-              >
-                例: ルーティン
-              </button>
-            </div>
-
-            <button
-              onClick={handleGenerate}
-              disabled={status === AppStatus.LOADING || !inputText.trim()}
-              className={`px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all flex items-center gap-2 ${
-                status === AppStatus.LOADING || !inputText.trim()
-                  ? "bg-slate-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-              }`}
-            >
-              {status === AppStatus.LOADING ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  生成中...
-                </>
-              ) : (
-                "図解を生成"
-              )}
-            </button>
-          </div>
-        </section>
-
-        {error && (
-          <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded shadow-sm">
-            <p className="flex items-center gap-2 font-medium">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              {error}
-            </p>
-          </div>
-        )}
-
-        {mermaidCode && (
-          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-              <h2 className="text-xl font-bold text-slate-800">生成されたフローチャート</h2>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleDownloadSVG}
-                  disabled={!isReadyForDownload}
-                  className={`px-5 py-2 text-white font-bold rounded-lg shadow flex items-center gap-2 transition-all ${
-                    isReadyForDownload ? "bg-blue-500 hover:bg-blue-600 active:scale-95" : "bg-slate-300 cursor-not-allowed"
-                  }`}
-                >
-                  SVG保存
-                </button>
-                <button
-                  onClick={handleDownloadPNG}
-                  disabled={!isReadyForDownload}
-                  className={`px-5 py-2 text-white font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all ${
-                    isReadyForDownload ? "bg-green-600 hover:bg-green-700 active:scale-95" : "bg-slate-300 cursor-not-allowed shadow-none"
-                  }`}
-                >
-                  PNG保存
-                </button>
-              </div>
-            </div>
-
-            <MermaidRenderer
-              chart={mermaidCode}
-              onRendered={() => setIsReadyForDownload(true)}
-              onError={(msg) => {
-                setError(msg);
-                setIsReadyForDownload(false);
-              }}
-            />
-
-            <details className="mt-6 group border border-slate-200 rounded-lg bg-slate-100 overflow-hidden transition-all">
-              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-200 transition-colors list-none select-none">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider font-bold">Mermaidコード</span>
-                </div>
-                <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="p-4 pt-0 border-t border-slate-200">
-                <pre className="text-[10px] sm:text-xs text-slate-600 overflow-x-auto whitespace-pre-wrap font-mono py-2">{mermaidCode}</pre>
-              </div>
-            </details>
-          </section>
-        )}
-
-        {status === AppStatus.IDLE && !mermaidCode && (
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-20 text-center text-slate-400">
-            <p>文章を入力して「図解を生成」をクリックしてください</p>
-          </div>
-        )}
-      </main>
-
-      <footer className="mt-20 text-center text-slate-400 text-sm border-t border-slate-200 pt-8 pb-12">
-        &copy; {new Date().getFullYear()} FlowChart AI Generator | 業務効率化を支援
-      </footer>
-    </div>
-  );
-};
-
-export default App;
-TSX
-
-cat > "$APP_DIR/.env.example" <<'ENV'
-# ここにAPIを入れる
-# Google AI Studio で取得したAPIキーを設定してください
-VITE_GEMINI_API_KEY=AIzaSyDBljntEkcSJdNFtUk3FHch-RRR95o6Cck
-ENV
-
-cat > "$APP_DIR/.gitignore" <<'GIT'
-node_modules
-dist
-.DS_Store
-.env
-.env.local
-.env.*.local
-GIT
-
-cat > "$APP_DIR/public/favicon.svg" <<'SVG'
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" ry="20" fill="#2563eb"/>
-  <path d="M30 30h10v40H30zM60 30h10v40H60z" fill="#fff"/>
-</svg>
-SVG
-
-cat > "$APP_DIR/README.md" <<'MD'
-# FlowChart AI Generator
-
-自然な日本語の業務説明から、Mermaid形式の業務フローチャートを自動生成するツールです。
-
-## セットアップ
-
-1) インストール
-npm install
-
-2) APIキー設定
-.env.example をコピーして .env を作成し、APIキーを設定してください。
-
-.env
-VITE_GEMINI_API_KEY=ここにAPIを入れる
-
-3) 起動
-npm run dev
-
-## 使い方
-
-- 入力欄に業務フロー文章を貼り付け
-- 図解を生成 を押す
-- SVG保存 / PNG保存 でダウンロード
-MD
-
-echo "OK: $APP_DIR を作成しました"
-echo "次に実行:"
-echo "  cd $APP_DIR"
-echo "  npm install"
-echo "  cp .env.example .env"
-echo "  ( .env の ここにAPIを入れる を自分のAPIキーに置換 )"
-echo "  npm run dev"
+  });
+</script>
+</body>
+</html>
