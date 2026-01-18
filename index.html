@@ -1,91 +1,57 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowChart AI - Stable</title>
+    <meta charset="UTF-8"><title>Debug FlowChart AI</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-    { "imports": { "@google/genai": "https://esm.sh/@google/genai@1.0.2" } }
-    </script>
-    <style>
-        body { background-color: #0b1220; color: #e5e7eb; font-family: sans-serif; }
-        .card { background: #111a2e; border: 1px solid #24324d; border-radius: 12px; padding: 20px; }
-        .preview { background: white; border-radius: 8px; min-height: 400px; padding: 20px; }
-        textarea { width: 100%; height: 200px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 8px; padding: 10px; resize: none; }
-        .btn { background: #fbbf24; color: #000; font-weight: bold; padding: 12px 24px; border-radius: 8px; cursor: pointer; border: none; width: 100%; }
-        .btn:disabled { background: #4b5563; cursor: not-allowed; }
-        #log { font-family: monospace; font-size: 11px; color: #94a3b8; margin-top: 10px; height: 80px; overflow-y: auto; background: #000; padding: 10px; }
-    </style>
+    <script type="importmap">{ "imports": { "@google/genai": "https://esm.sh/@google/genai@1.0.2" } }</script>
 </head>
-<body class="p-4">
-    <div class="max-w-6xl mx-auto">
-        <h1 class="text-2xl font-bold text-amber-400 mb-6">FlowChart AI Generator</h1>
+<body class="bg-slate-900 text-white p-5">
+    <div class="max-w-xl mx-auto space-y-4">
+        <h1 class="text-xl font-bold text-amber-500">動作診断モード</h1>
+        <textarea id="uInput" class="w-full h-20 bg-slate-800 p-2 rounded" placeholder="テスト"></textarea>
+        <button id="uBtn" class="w-full bg-amber-600 p-3 rounded font-bold">このボタンを押して診断開始</button>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="card">
-                <textarea id="userInput" placeholder="例：注文を受ける。在庫を確認し、あれば発送。なければキャンセル。"></textarea>
-                <button id="genBtn" class="btn mt-4">図解を生成する</button>
-                <div id="log">システム準備完了</div>
-            </div>
-            
-            <div class="card text-black">
-                <div id="diagramContainer" class="preview flex justify-center items-center">
-                    <div id="mermaidTarget">ここに図が表示されます</div>
-                </div>
-            </div>
+        <div id="uLog" class="bg-black p-4 rounded text-xs font-mono h-64 overflow-auto border border-slate-700">
+            <div>> 準備完了。ボタンを押してください。</div>
         </div>
+        
+        <div id="uPreview" class="bg-white p-4 rounded min-h-[200px] text-black">
+            </div>
     </div>
 
     <script type="module">
         import { GoogleGenAI } from "@google/genai";
-
         // ★ここにAPIキーを入れてください
-        const API_KEY = "AIzaSyDBljntEkcSJdNFtUk3FHch-RRR95o6Cck"; 
+        const KEY = "AIzaSyDBljntEkcSJdNFtUk3FHch-RRR95o6Cck"; 
 
-        const logEl = document.getElementById('log');
-        const target = document.getElementById('mermaidTarget');
-        const btn = document.getElementById('genBtn');
+        const log = (m) => { document.getElementById('uLog').innerHTML += `<div>> ${m}</div>`; };
+        const target = document.getElementById('uPreview');
 
-        function addLog(m) { logEl.innerHTML += `<div>> ${m}</div>`; logEl.scrollTop = logEl.scrollHeight; }
-
-        // Mermaidの初期化設定（エラー防止用）
-        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
-
-        btn.onclick = async () => {
-            const text = document.getElementById('userInput').value;
-            if (!text) return alert("文章を入力してください");
-
-            btn.disabled = true;
-            target.innerHTML = "AI解析中...";
-            addLog("AIへリクエスト送信中...");
-
+        document.getElementById('uBtn').onclick = async () => {
+            log("診断開始...");
+            if(KEY.includes("あなたのAPIキー")) { log("エラー: APIキーが書き換えられていません！"); return; }
+            
             try {
-                const genAI = new GoogleGenAI(API_KEY);
+                log("1. Google AIサーバーに接続を試みます...");
+                const genAI = new GoogleGenAI(KEY);
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                 
-                const prompt = `Convert this to Mermaid graph TD code. Output ONLY the code, no text: ${text}`;
-                const result = await model.generateContent(prompt);
-                let code = result.response.text();
-                
-                // コード整形（余計なものを削る）
-                code = code.replace(/```mermaid/g, "").replace(/```/g, "").trim();
-                if (!code.startsWith("graph")) code = "graph TD\n" + code;
-                
-                addLog("描画処理を開始...");
-                
-                // 【最重要】Mermaid 10系での描画エラーを回避する確実な方法
+                log("2. AIに図解コードを作らせています...");
+                const res = await model.generateContent("graph TD\nA-->B を出力して");
+                const code = res.response.text().replace(/```mermaid|```/g, "").trim();
+                log("AIからの応答: " + code);
+
+                log("3. Mermaidで図を描画します...");
+                mermaid.initialize({ startOnLoad: false, theme: 'default' });
                 target.innerHTML = "";
-                const { svg } = await mermaid.render('render' + Date.now(), code);
+                const { svg } = await mermaid.render('d' + Date.now(), code);
                 target.innerHTML = svg;
-                
-                addLog("成功！");
+                log("成功！図が表示されました。");
             } catch (e) {
-                addLog("エラー: " + e.message);
-                target.innerHTML = "<span style='color:red'>描画できませんでした。APIキーや入力内容を確認してください。</span>";
-            } finally {
-                btn.disabled = false;
+                log("！！致命的エラー発生！！");
+                log("内容: " + e.message);
+                console.error(e);
             }
         };
     </script>
