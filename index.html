@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowChart AI Generator - Professional Edition</title>
+    <title>FlowChart AI - Ultimate Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
@@ -11,60 +11,38 @@
     { "imports": { "@google/genai": "https://esm.sh/@google/genai@^1.37.0" } }
     </script>
     <style>
-        :root { --bg: #0b1220; --panel: #111a2e; --accent: #fbbf24; --border: #24324d; }
-        body { background: radial-gradient(circle at top, #1e293b, #070b14); color: #e5e7eb; min-height: 100vh; font-family: 'Inter', sans-serif; }
-        .glass-card { background: rgba(17, 26, 46, 0.8); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 1rem; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        .preview-area { background: white; border-radius: 0.75rem; min-height: 400px; display: flex; align-items: center; justify-content: center; position: relative; overflow: auto; }
-        textarea { background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border); color: #fff; transition: all 0.3s; }
-        textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2); }
-        .loading-shimmer { background: linear-gradient(90deg, #111a2e 25%, #1e293b 50%, #111a2e 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        :root { --bg: #0b1220; --accent: #fbbf24; }
+        body { background: #0b1220; color: #e5e7eb; font-family: sans-serif; margin: 0; padding: 20px; }
+        .glass { background: rgba(17, 26, 46, 0.9); border: 1px solid #24324d; border-radius: 12px; }
+        .preview-box { background: white; border-radius: 8px; min-height: 400px; overflow: auto; display: flex; justify-content: center; align-items: center; border: 4px solid #1e293b; }
+        textarea { background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; padding: 15px; width: 100%; height: 200px; resize: none; }
+        .btn-main { background: linear-gradient(to right, #f59e0b, #ea580c); color: black; font-weight: bold; padding: 12px 24px; border-radius: 8px; cursor: pointer; border: none; }
+        .btn-main:disabled { opacity: 0.3; cursor: not-allowed; }
+        .log-area { background: #000; border: 1px solid #1e293b; padding: 10px; font-family: monospace; font-size: 11px; color: #64748b; height: 100px; overflow-y: auto; margin-top: 10px; }
     </style>
 </head>
-<body class="p-6">
-    <div class="max-w-7xl mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">FlowChart AI Generator</h1>
-                <p class="text-slate-400 text-sm mt-1 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Gemini 1.5 Flash 連携済み
-                </p>
-            </div>
-            <div id="status-badge" class="px-4 py-2 rounded-full bg-slate-800 border border-slate-700 text-xs font-mono text-slate-300">SYSTEM READY</div>
+<body>
+    <div style="max-width: 1100px; margin: 0 auto;">
+        <header style="margin-bottom: 20px;">
+            <h1 style="color: #fbbf24; font-size: 24px; margin: 0;">FlowChart AI Generator</h1>
+            <p style="font-size: 12px; color: #94a3b8;">入力された文章からAIがMermaid図解を生成します</p>
         </header>
 
-        <div class="grid grid-cols-1 xl:grid-cols-5 gap-8">
-            <div class="xl:col-span-2 space-y-6">
-                <div class="glass-card p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400 font-mono">Input Description</h2>
-                        <button id="example-btn" class="text-xs text-amber-500 hover:text-amber-400 transition">例文を挿入</button>
-                    </div>
-                    <textarea id="prompt-input" class="w-full h-64 p-4 rounded-lg resize-none text-sm leading-relaxed" placeholder="業務フローを日本語で自由に記述してください..."></textarea>
-                    
-                    <div class="mt-6 space-y-3">
-                        <button id="generate-btn" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-black py-4 rounded-xl transition-all transform active:scale-95 shadow-xl shadow-amber-900/20">
-                            図解を生成する (AI解析)
-                        </button>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button id="png-btn" disabled class="bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed py-3 rounded-lg text-xs font-bold border border-slate-700 transition">PNGで保存</button>
-                            <button id="copy-btn" disabled class="bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed py-3 rounded-lg text-xs font-bold border border-slate-700 transition">コードをコピー</button>
-                        </div>
-                    </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="glass" style="padding: 20px;">
+                <div style="margin-bottom: 10px; font-size: 14px; font-weight: bold;">Step 1: 業務内容を入力</div>
+                <textarea id="ai-input" placeholder="例：メールを受信する。内容を確認し、重要なら返信する。そうでなければ削除する。"></textarea>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button id="run-btn" class="btn-main">図解を生成する</button>
+                    <button id="save-png" style="background:#334155; color:white; border-radius:8px; padding:0 15px; font-size:12px;" disabled>PNG保存</button>
                 </div>
-
-                <div id="console-log" class="glass-card p-4 h-32 overflow-y-auto font-mono text-[10px] text-slate-500 space-y-1">
-                    <div>> System initialized. Awaiting user input...</div>
-                </div>
+                <div id="debug-log" class="log-area">システム待機中...</div>
             </div>
 
-            <div class="xl:col-span-3 space-y-6">
-                <div class="glass-card p-6 min-h-[500px] flex flex-col">
-                    <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400 font-mono mb-4">Live Preview</h2>
-                    <div id="capture-box" class="preview-area flex-grow shadow-inner">
-                        <div id="mermaid-root" class="w-full p-4">
-                            </div>
-                    </div>
+            <div class="glass" style="padding: 20px;">
+                <div style="margin-bottom: 10px; font-size: 14px; font-weight: bold;">Step 2: プレビュー表示</div>
+                <div id="capture-area" class="preview-box">
+                    <div id="mermaid-target" style="width: 100%; text-align: center; color: #64748b;">ここに図が表示されます</div>
                 </div>
             </div>
         </div>
@@ -73,91 +51,66 @@
     <script type="module">
         import { GoogleGenAI } from "@google/genai";
 
-        // 【ここをあなたのキーに！】
+        // ★★★ここにあなたのAPIキーを貼り付けてください★★★
         const API_KEY = "AIzaSyDBljntEkcSJdNFtUk3FHch-RRR95o6Cck"; 
 
-        const genAI = new GoogleGenAI(API_KEY);
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
-            systemInstruction: "あなたはMermaid.jsのエキスパートです。文章を解析し、必ず「graph TD」から始まるMermaidコードだけを出力してください。説明や挨拶は一切禁止です。もし分岐があるなら「-- はい -->」のように日本語で矢印にラベルをつけてください。"
-        });
-
-        const elements = {
-            input: document.getElementById('prompt-input'),
-            render: document.getElementById('mermaid-root'),
-            log: document.getElementById('console-log'),
-            btnGen: document.getElementById('generate-btn'),
-            btnPng: document.getElementById('png-btn'),
-            btnCopy: document.getElementById('copy-btn'),
-            status: document.getElementById('status-badge'),
-            example: document.getElementById('example-btn')
+        const log = (msg) => {
+            const el = document.getElementById('debug-log');
+            el.innerHTML += `<div>> ${msg}</div>`;
+            el.scrollTop = el.scrollHeight;
         };
 
-        mermaid.initialize({ startOnLoad: false, theme: 'neutral', fontFamily: 'Inter' });
+        const runBtn = document.getElementById('run-btn');
+        const mermaidTarget = document.getElementById('mermaid-target');
 
-        function addLog(msg, color = 'text-slate-500') {
-            const div = document.createElement('div');
-            div.className = color;
-            div.innerText = `> ${msg}`;
-            elements.log.appendChild(div);
-            elements.log.scrollTop = elements.log.scrollHeight;
-        }
+        // Mermaid初期化
+        try {
+            mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+            log("Mermaid.js 読み込み成功");
+        } catch(e) { log("Mermaid初期化エラー: " + e.message); }
 
-        elements.example.onclick = () => {
-            elements.input.value = "顧客が注文する。在庫を確認し、在庫があれば発送準備。在庫がなければ取り寄せ依頼を出す。最後に完了メールを送る。";
-        };
-
-        elements.btnGen.onclick = async () => {
-            const prompt = elements.input.value.trim();
-            if (!prompt) return alert("文章を入力してください");
-
-            elements.btnGen.disabled = true;
-            elements.status.innerText = "AI THINKING...";
-            elements.status.className = "px-4 py-2 rounded-full bg-amber-900/30 border border-amber-700 text-xs font-mono text-amber-400 animate-pulse";
-            addLog("Calling Gemini AI API...", "text-amber-400");
+        runBtn.onclick = async () => {
+            const input = document.getElementById('ai-input').value;
+            if(!input) return alert("文章を入力してください");
+            
+            runBtn.disabled = true;
+            log("Gemini AIに接続中...");
 
             try {
+                const genAI = new GoogleGenAI(API_KEY);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                
+                const prompt = `以下の業務フローをMermaid.jsのgraph TD形式で出力してください。コードブロック以外は出力しないでください。\n\n${input}`;
                 const result = await model.generateContent(prompt);
-                let code = result.response.text();
+                let code = await result.response.text();
                 
-                // 強力なコード抽出処理
+                // 余計な文字を掃除
                 code = code.replace(/```mermaid/g, "").replace(/```/g, "").trim();
-                const startIdx = code.indexOf("graph");
-                if (startIdx !== -1) code = code.substring(startIdx);
+                log("AIからの応答を受信。描画を開始します。");
 
-                addLog("AI response received. Rendering diagram...");
-                elements.render.innerHTML = "";
+                // 描画処理
+                mermaidTarget.innerHTML = "";
+                const { svg } = await mermaid.render('graphDiv', code);
+                mermaidTarget.innerHTML = svg;
                 
-                const { svg } = await mermaid.render('svg-' + Date.now(), code);
-                elements.render.innerHTML = svg;
-
-                addLog("Success! Diagram generated.", "text-green-400");
-                elements.status.innerText = "RENDER SUCCESS";
-                elements.status.className = "px-4 py-2 rounded-full bg-green-900/30 border border-green-700 text-xs font-mono text-green-400";
-                
-                elements.btnPng.disabled = false;
-                elements.btnCopy.disabled = false;
-                elements.btnCopy.onclick = () => {
-                    navigator.clipboard.writeText(code);
-                    addLog("Code copied to clipboard.");
-                };
+                log("描画成功！");
+                document.getElementById('save-png').disabled = false;
 
             } catch (err) {
+                log("エラー発生: " + err.message);
                 console.error(err);
-                addLog(`Error: ${err.message}`, "text-red-400");
-                elements.status.innerText = "SYSTEM ERROR";
-                elements.status.className = "px-4 py-2 rounded-full bg-red-900/30 border border-red-700 text-xs font-mono text-red-400";
             } finally {
-                elements.btnGen.disabled = false;
+                runBtn.disabled = false;
             }
         };
 
-        elements.btnPng.onclick = async () => {
-            const dataUrl = await htmlToImage.toPng(document.getElementById('capture-box'), { backgroundColor: '#fff' });
-            const link = document.createElement('a');
-            link.download = `flowchart-${Date.now()}.png`;
-            link.href = dataUrl;
-            link.click();
+        // PNG保存機能
+        document.getElementById('save-png').onclick = async () => {
+            const dataUrl = await htmlToImage.toPng(document.getElementById('capture-area'));
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = "flowchart.png";
+            a.click();
         };
     </script>
 </body>
