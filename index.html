@@ -146,4 +146,19 @@
                 console.error(err);
                 addLog(`Error: ${err.message}`, "text-red-400");
                 elements.status.innerText = "SYSTEM ERROR";
-                elements.status.className = "px-4 py-2 rounded-full bg-red-900/30 border border-red-700 text-xs font-mono text-
+                elements.status.className = "px-4 py-2 rounded-full bg-red-900/30 border border-red-700 text-xs font-mono text-red-400";
+            } finally {
+                elements.btnGen.disabled = false;
+            }
+        };
+
+        elements.btnPng.onclick = async () => {
+            const dataUrl = await htmlToImage.toPng(document.getElementById('capture-box'), { backgroundColor: '#fff' });
+            const link = document.createElement('a');
+            link.download = `flowchart-${Date.now()}.png`;
+            link.href = dataUrl;
+            link.click();
+        };
+    </script>
+</body>
+</html>
