@@ -1,632 +1,121 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>業務フロー図解生成アプリ</title>
-
-  <!-- Mermaid -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowChart AI Generator (Gemini Powered)</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-
-  <!-- PNG生成: html-to-image（DOMをそのままPNG化） -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
 
+  <script type="importmap">
+  {
+    "imports": {
+      "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+    }
+  }
+  </script>
+
   <style>
-    :root{
-      --bg:#0b1220;
-      --panel:#111a2e;
-      --panel2:#0f172a;
-      --text:#e5e7eb;
-      --muted:#9ca3af;
-      --border:#24324d;
-      --accent:#fbbf24;
-      --accent2:#60a5fa;
-      --danger:#f87171;
-      --ok:#34d399;
-    }
-    html, body { height: 100%; }
-    body{
-      margin:0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
-      background: linear-gradient(180deg, var(--bg), #070b14);
-      color: var(--text);
-    }
-    .wrap{
-      max-width: 1100px;
-      margin: 24px auto;
-      padding: 0 16px 32px;
-    }
-    .header{
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .title{
-      font-size: 20px;
-      letter-spacing: .02em;
-    }
-    .subtitle{
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 6px;
-      line-height: 1.6;
-    }
-    .grid{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-    }
-    @media (min-width: 980px){
-      .grid{ grid-template-columns: 1.05fr .95fr; }
-    }
-    .card{
-      background: rgba(17,26,46,.82);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.35);
-      overflow:hidden;
-    }
-    .card-h{
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 10px;
-    }
-    .card-h .h{
-      font-size: 13px;
-      color: #cbd5e1;
-      letter-spacing: .02em;
-    }
-    .card-b{
-      padding: 14px;
-    }
-    textarea{
-      width: 100%;
-      min-height: 190px;
-      resize: vertical;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(15,23,42,.9);
-      color: var(--text);
-      padding: 12px 12px;
-      line-height: 1.7;
-      outline: none;
-    }
-    textarea:focus{
-      border-color: rgba(251,191,36,.75);
-      box-shadow: 0 0 0 3px rgba(251,191,36,.12);
-    }
-    .btns{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top: 12px;
-    }
-    button{
-      appearance:none;
-      border: 1px solid var(--border);
-      background: rgba(15,23,42,.9);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 13px;
-      cursor:pointer;
-      transition: .15s ease;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-    }
-    button:hover{ transform: translateY(-1px); border-color: rgba(96,165,250,.65); }
-    button.primary{
-      background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(96,165,250,.14));
-      border-color: rgba(251,191,36,.55);
-    }
-    button.primary:hover{ border-color: rgba(251,191,36,.9); }
-    button:disabled{
-      opacity:.45;
-      cursor:not-allowed;
-      transform:none;
-    }
-    .hint{
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 10px;
-      line-height: 1.6;
-    }
-    .status{
-      margin-top: 10px;
-      font-size: 12px;
-      line-height: 1.6;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(15,23,42,.65);
-      color: var(--muted);
-      white-space: pre-wrap;
-    }
-    .status.ok{ border-color: rgba(52,211,153,.35); color: #b7f7df; }
-    .status.err{ border-color: rgba(248,113,113,.45); color: #ffd0d0; }
-    .previewWrap{
-      background: rgba(15,23,42,.65);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px;
-      overflow:auto;
-      min-height: 300px;
-    }
-    .previewInner{
-      background: #ffffff;
-      border-radius: 10px;
-      padding: 10px;
-      display:inline-block;
-      min-width: 320px;
-    }
-    .codeBox{
-      margin-top: 10px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(15,23,42,.65);
-      padding: 10px 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size: 12px;
-      color: #cbd5e1;
-      white-space: pre;
-      overflow:auto;
-      max-height: 260px;
-    }
-    .pill{
-      font-size: 11px;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 5px 10px;
-      background: rgba(15,23,42,.65);
-    }
-    .smallLink{
-      color: #cbd5e1;
-      text-decoration: underline;
-      cursor:pointer;
-      font-size: 12px;
-    }
+    /* あなたのアプリのダークブルー基調のデザインを継承 */
+    body { background-color: #0b1220; color: #e5e7eb; }
+    .card { background: rgba(17,26,46,.82); border: 1px solid #24324d; border-radius: 14px; }
   </style>
 </head>
+<body class="p-4 md:p-8">
+  <div class="max-w-5xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-2xl font-bold text-amber-400">業務フロー図解生成 AI</h1>
+      <p class="text-gray-400 text-sm">Gemini AIが文章を解析し、最適なフローチャートを自動生成します。</p>
+    </header>
 
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div>
-        <div class="title">業務フロー図解生成アプリ</div>
-        <div class="subtitle">
-          入力した日本語から処理ステップと分岐を抽出し、Mermaidのフローチャートを生成します。<br>
-          SVGとPNGは外部遷移なしでローカルに保存できます。
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card p-6">
+        <label class="block text-sm mb-2">業務内容を入力</label>
+        <textarea id="inputText" class="w-full h-48 bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-amber-500 outline-none" placeholder="例：申請を受け取る。内容を確認し、不備があれば差し戻す。なければ承認する。"></textarea>
+        
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button id="btnGenerate" class="bg-amber-500 hover:bg-amber-600 text-black font-bold py-2 px-6 rounded-lg transition-all">図解を生成</button>
+          <button id="btnDownloadPNG" class="bg-slate-700 hover:bg-slate-600 py-2 px-4 rounded-lg text-sm disabled:opacity-50" disabled>PNG保存</button>
         </div>
-      </div>
-      <div class="pill" id="renderState">未生成</div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="card-h">
-          <div class="h">テキスト入力</div>
-          <div class="smallLink" id="fillExample">例を入れる</div>
-        </div>
-        <div class="card-b">
-          <textarea id="input"
-            placeholder="業務フローを自然な日本語で記述してください。例: 顧客から問い合わせが来たら、まず内容を確認する。技術的な質問なら技術部に転送。価格の質問なら営業部に転送。それ以外は総務部に転送する。"></textarea>
-
-          <div class="btns">
-            <button class="primary" id="btnGenerate">図解を生成</button>
-            <button id="btnCopyMermaid" disabled>Mermaidコードをコピー</button>
-            <button id="btnDownloadSVG" disabled>SVGをダウンロード</button>
-            <button id="btnDownloadPNG" disabled>PNGをダウンロード</button>
-          </div>
-
-          <div class="hint">
-            生成精度は入力文の書き方に依存します。句点「。」で区切り、分岐は「もし〜なら」「〜の場合」「〜なら」「それ以外」を使うと安定します。
-          </div>
-
-          <div id="status" class="status">準備完了</div>
-        </div>
+        <div id="status" class="mt-4 text-xs text-gray-500 italic">準備完了</div>
       </div>
 
-      <div class="card">
-        <div class="card-h">
-          <div class="h">プレビュー</div>
-          <div class="pill" id="svgState">SVGなし</div>
-        </div>
-        <div class="card-b">
-          <div class="previewWrap" id="previewWrap">
-            <div class="previewInner" id="previewInner">
-              <div id="diagram"></div>
-            </div>
-          </div>
-
-          <div class="card-h" style="margin-top:12px;border-radius:12px;">
-            <div class="h">生成されたMermaidコード</div>
-          </div>
-          <div class="codeBox" id="mermaidCode">未生成</div>
+      <div class="card p-6">
+        <h2 class="text-sm font-bold mb-4 text-slate-400 uppercase">プレビュー</h2>
+        <div id="previewContainer" class="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center overflow-auto">
+          <div id="diagram" class="w-full text-black"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <script>
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: "strict",
-      theme: "default",
-      flowchart: { curve: "basis" }
+  <script type="module">
+    import { GoogleGenAI } from "@google/genai";
+
+    // --- 設定 ---
+    // GitHubに公開する場合は、APIキーを直接書かずに運用するのが理想ですが、
+    // まず動かすために、ここにご自身のキーを貼り付けて動作確認してください。
+    const API_KEY = "AIzaSyDBljntEkcSJdNFtUk3FHch-RRR95o6Cck"; 
+
+    const genAI = new GoogleGenAI(API_KEY);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: "あなたはMermaid.jsのエキスパートです。入力された業務を解析し、必ず ```mermaid で始まるコードブロックのみを返してください。graph TD形式を使用してください。"
     });
 
-    const elInput = document.getElementById("input");
-    const elDiagram = document.getElementById("diagram");
-    const elMermaidCode = document.getElementById("mermaidCode");
-    const elStatus = document.getElementById("status");
-    const elRenderState = document.getElementById("renderState");
-    const elSvgState = document.getElementById("svgState");
+    // --- 要素の取得 ---
+    const btnGenerate = document.getElementById('btnGenerate');
+    const inputText = document.getElementById('inputText');
+    const diagramDiv = document.getElementById('diagram');
+    const status = document.getElementById('status');
+    const btnDownloadPNG = document.getElementById('btnDownloadPNG');
 
-    const btnGenerate = document.getElementById("btnGenerate");
-    const btnCopyMermaid = document.getElementById("btnCopyMermaid");
-    const btnDownloadSVG = document.getElementById("btnDownloadSVG");
-    const btnDownloadPNG = document.getElementById("btnDownloadPNG");
+    // Mermaidの初期化
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
-    const fillExample = document.getElementById("fillExample");
+    // 生成処理
+    btnGenerate.onclick = async () => {
+      const text = inputText.value.trim();
+      if (!text) return;
 
-    let lastMermaid = "";
-    let lastSvgEl = null;
+      status.innerText = "AIが思考中...";
+      btnGenerate.disabled = true;
 
-    function setStatus(msg, type){
-      elStatus.className = "status";
-      if(type === "ok") elStatus.classList.add("ok");
-      if(type === "err") elStatus.classList.add("err");
-      elStatus.textContent = msg;
-    }
+      try {
+        const result = await model.generateContent(text);
+        const response = await result.response;
+        let code = response.text();
+        
+        // Mermaidコードの抽出
+        code = code.replace(/```mermaid/g, "").replace(/```/g, "").trim();
 
-    function pad2(n){ return String(n).padStart(2,"0"); }
-    function fileStamp(){
-      const d = new Date();
-      const y = d.getFullYear();
-      const mo = pad2(d.getMonth()+1);
-      const da = pad2(d.getDate());
-      const hh = pad2(d.getHours());
-      const mi = pad2(d.getMinutes());
-      return `${y}${mo}${da}_${hh}${mi}`;
-    }
-
-    function escapeLabel(s){
-      return s.replace(/[\[\]\{\}\(\)\|"]/g, " ").replace(/\s+/g," ").trim();
-    }
-
-    function splitSentences(text){
-      return text
-        .replace(/\r\n/g,"\n")
-        .split(/[。.\n]+/)
-        .map(s=>s.trim())
-        .filter(Boolean);
-    }
-
-    function buildMermaidFromJapanese(text){
-      const sents = splitSentences(text);
-
-      if(sents.length === 0){
-        return { ok:false, reason:"入力が空です。文章を入力してください。", code:"" };
-      }
-
-      const steps = [];
-      for(const s of sents){
-        steps.push(s);
-      }
-
-      // 方針:
-      // 1) 先頭を開始ノードにする
-      // 2) 「なら」「の場合」「もし」を含む文が複数続く場合は、直前に分岐ノードを置く
-      // 3) 「それ以外」「その他」は分岐の最後のデフォルト扱い
-      // 4) 「あれば」「なければ」「不備があれば」などは二択分岐扱いに近い形へ
-      //
-      // 仕様に対して、実務で破綻しにくい最小実装にしている（完全な日本語解析ではない）
-
-      const lines = [];
-      lines.push("graph TD");
-
-      const nodes = [];
-      let id = 0;
-      function nid(){ id += 1; return "N" + id; }
-
-      const startId = nid();
-      nodes.push({ id:startId, label: escapeLabel(steps[0]) });
-
-      let prev = startId;
-
-      // 分岐バッファ
-      // branchCandidates: [{cond, action, isElse}]
-      let branchCandidates = [];
-
-      function flushBranches(){
-        if(branchCandidates.length === 0) return;
-
-        const decisionId = nid();
-        const decisionLabel = branchCandidates.length >= 2
-          ? "分岐"
-          : "条件";
-        nodes.push({ id:decisionId, label: `{${decisionLabel}}`, isDecision:true });
-
-        lines.push(`${prev}[${nodes.find(n=>n.id===prev)?.label || "処理"}] --> ${decisionId}${nodes.find(n=>n.id===decisionId).label}`);
-
-        // 分岐の出口を作る
-        const endJoin = nid();
-        nodes.push({ id:endJoin, label: "終了", isEnd:true });
-
-        for(const b of branchCandidates){
-          const actId = nid();
-          nodes.push({ id:actId, label: escapeLabel(b.action) });
-
-          const edgeLabel = b.isElse ? "それ以外" : escapeLabel(b.cond || "条件");
-          lines.push(`${decisionId} -->|${edgeLabel}| ${actId}[${nodes.find(n=>n.id===actId).label}]`);
-          lines.push(`${actId}[${nodes.find(n=>n.id===actId).label}] --> ${endJoin}((終了))`);
-        }
-
-        prev = endJoin;
-        branchCandidates = [];
-      }
-
-      // 2文目以降を処理
-      for(let i=1;i<steps.length;i++){
-        const s = steps[i];
-
-        // 分岐候補判定
-        // 例: "技術的な質問なら技術部に転送"
-        const mNara = s.match(/(.+?)なら(.+)/);
-        const mIf = s.match(/^もし(.+?)なら(.+)/);
-        const mCase = s.match(/(.+?)の場合(.+)/);
-        const isElse = /それ以外|その他|それ以外は/.test(s);
-
-        // 二択っぽい表現
-        // 例: "不備があれば差し戻す" / "不備がなければ承認する"
-        const mAreba = s.match(/(.+?)があれば(.+)/);
-        const mNakereba = s.match(/(.+?)がなければ(.+)/);
-
-        if(isElse){
-          branchCandidates.push({ cond:"", action: s.replace(/それ以外(は)?/,"").trim() || "対応する", isElse:true });
-          continue;
-        }
-
-        if(mIf){
-          branchCandidates.push({ cond: mIf[1].trim(), action: mIf[2].trim(), isElse:false });
-          continue;
-        }
-        if(mCase){
-          branchCandidates.push({ cond: mCase[1].trim() + "の場合", action: mCase[2].trim(), isElse:false });
-          continue;
-        }
-        if(mNara){
-          // "AならB" で分岐候補
-          branchCandidates.push({ cond: mNara[1].trim(), action: mNara[2].trim(), isElse:false });
-          continue;
-        }
-        if(mAreba){
-          // 二択候補の片側として扱う
-          branchCandidates.push({ cond: mAreba[1].trim() + "あり", action: mAreba[2].trim(), isElse:false });
-          continue;
-        }
-        if(mNakereba){
-          // 二択候補の片側として扱う（else扱いに寄せる）
-          branchCandidates.push({ cond: mNakereba[1].trim() + "なし", action: mNakereba[2].trim(), isElse:false });
-          continue;
-        }
-
-        // 分岐候補が溜まっていたら確定
-        if(branchCandidates.length > 0){
-          flushBranches();
-        }
-
-        // 通常ステップ
-        const cur = nid();
-        nodes.push({ id:cur, label: escapeLabel(s) });
-        const prevLabel = nodes.find(n=>n.id===prev)?.label || "処理";
-        lines.push(`${prev}[${prevLabel}] --> ${cur}[${nodes.find(n=>n.id===cur).label}]`);
-        prev = cur;
-      }
-
-      // 最後に分岐候補が残っていたら確定
-      if(branchCandidates.length > 0){
-        flushBranches();
-      } else {
-        // 終了ノードを付与
-        const end = nid();
-        nodes.push({ id:end, label:"終了", isEnd:true });
-        const prevLabel = nodes.find(n=>n.id===prev)?.label || "処理";
-        lines.push(`${prev}[${prevLabel}] --> ${end}((終了))`);
-      }
-
-      // Mermaidコードを整形
-      const code = lines.join("\n");
-      return { ok:true, reason:"", code };
-    }
-
-    async function renderMermaid(code){
-      elDiagram.innerHTML = "";
-      lastSvgEl = null;
-      elSvgState.textContent = "SVGなし";
-      elRenderState.textContent = "生成中";
-      btnCopyMermaid.disabled = true;
-      btnDownloadSVG.disabled = true;
-      btnDownloadPNG.disabled = true;
-
-      try{
-        const renderId = "mmd_" + Math.random().toString(36).slice(2);
-        const { svg } = await mermaid.render(renderId, code);
-        elDiagram.innerHTML = svg;
-
-        // SVG要素取得
-        const svgEl = elDiagram.querySelector("svg");
-        if(!svgEl){
-          throw new Error("SVGが生成されませんでした（Mermaidの描画失敗）。");
-        }
-
-        // 見切れ対策: viewBox/width/heightを調整
-        // MermaidのSVGは viewBox が無いことがあるため bbox から設定
-        try{
-          const bbox = svgEl.getBBox();
-          const pad = 12;
-          const vb = `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad*2} ${bbox.height + pad*2}`;
-          svgEl.setAttribute("viewBox", vb);
-          svgEl.setAttribute("width", String(Math.ceil(bbox.width + pad*2)));
-          svgEl.setAttribute("height", String(Math.ceil(bbox.height + pad*2)));
-        }catch(e){
-          // getBBoxが失敗しても描画自体は成立し得るので継続
-          console.error(e);
-        }
-
-        lastSvgEl = svgEl;
-        elSvgState.textContent = "SVGあり";
-        elRenderState.textContent = "生成済み";
-
-        btnCopyMermaid.disabled = false;
-        btnDownloadSVG.disabled = false;
+        status.innerText = "図解を描画中...";
+        
+        // 描画
+        const { svg } = await mermaid.render('id' + Date.now(), code);
+        diagramDiv.innerHTML = svg;
+        
+        status.innerText = "生成完了！";
         btnDownloadPNG.disabled = false;
-
-        setStatus("生成完了。SVG/PNGのダウンロードが可能です。", "ok");
-      }catch(err){
+      } catch (err) {
         console.error(err);
-        elRenderState.textContent = "失敗";
-        btnCopyMermaid.disabled = true;
-        btnDownloadSVG.disabled = true;
-        btnDownloadPNG.disabled = true;
-        setStatus("描画に失敗しました。\n理由: " + (err?.message || String(err)), "err");
+        status.innerText = "エラーが発生しました。APIキーを確認してください。";
+      } finally {
+        btnGenerate.disabled = false;
       }
-    }
+    };
 
-    // ここがSVG保存（外部遷移なし）
-    function downloadSVG(){
-      if(!lastSvgEl){
-        setStatus("SVGが取得できません。図解が未生成、または描画に失敗しています。", "err");
-        return;
-      }
-
-      try{
-        // SVG文字列生成
-        const clone = lastSvgEl.cloneNode(true);
-
-        // スタイル保持: MermaidのSVGは多くがSVG内にstyleを持つため、そのまま保存で崩れにくい
-        // 念のため xmlns を付与
-        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-        const serializer = new XMLSerializer();
-        const svgText = serializer.serializeToString(clone);
-
-        const blob = new Blob(
-          ['<?xml version="1.0" encoding="UTF-8"?>\n' + svgText],
-          { type: "image/svg+xml;charset=utf-8" }
-        );
-
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `flowchart_${fileStamp()}.svg`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-
-        setStatus("SVGのダウンロードを開始しました。", "ok");
-      }catch(err){
-        console.error(err);
-        setStatus("SVGのダウンロードに失敗しました。\n理由: " + (err?.message || String(err)), "err");
-      }
-    }
-
-    // ここがPNG変換（DOMをそのままPNG化）
-    async function downloadPNG(){
-      if(!lastSvgEl){
-        setStatus("PNGを作成できません。SVGがまだ生成されていません。", "err");
-        return;
-      }
-
-      const target = document.getElementById("previewInner");
-      if(!target){
-        setStatus("PNGを作成できません。対象DOMが取得できません。", "err");
-        return;
-      }
-
-      try{
-        // ここがPNG変換
-        const dataUrl = await htmlToImage.toPng(target, {
-          cacheBust: true,
-          pixelRatio: 2,
-          backgroundColor: "#ffffff"
-        });
-
-        // ここが保存（外部遷移なし）
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = `flowchart_${fileStamp()}.png`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        setStatus("PNGのダウンロードを開始しました。", "ok");
-      }catch(err){
-        console.error(err);
-        setStatus(
-          "PNGのダウンロードに失敗しました。\n理由: " + (err?.message || String(err)) +
-          "\n代替案: SVGをダウンロードして PowerPoint/Googleスライドに貼り付けてください。",
-          "err"
-        );
-      }
-    }
-
-    btnGenerate.addEventListener("click", async ()=>{
-      const text = elInput.value.trim();
-
-      const res = buildMermaidFromJapanese(text);
-      if(!res.ok){
-        lastMermaid = "";
-        elMermaidCode.textContent = "未生成";
-        setStatus(res.reason, "err");
-        elRenderState.textContent = "未生成";
-        btnCopyMermaid.disabled = true;
-        btnDownloadSVG.disabled = true;
-        btnDownloadPNG.disabled = true;
-        return;
-      }
-
-      lastMermaid = res.code;
-      elMermaidCode.textContent = lastMermaid;
-      setStatus("Mermaidコードを生成しました。描画を開始します。", "ok");
-      await renderMermaid(lastMermaid);
-    });
-
-    btnCopyMermaid.addEventListener("click", async ()=>{
-      if(!lastMermaid){
-        setStatus("コピーできません。まず図解を生成してください。", "err");
-        return;
-      }
-      try{
-        await navigator.clipboard.writeText(lastMermaid);
-        setStatus("Mermaidコードをクリップボードにコピーしました。", "ok");
-      }catch(err){
-        console.error(err);
-        setStatus("コピーに失敗しました。\n理由: " + (err?.message || String(err)), "err");
-      }
-    });
-
-    btnDownloadSVG.addEventListener("click", downloadSVG);
-    btnDownloadPNG.addEventListener("click", downloadPNG);
-
-    fillExample.addEventListener("click", ()=>{
-      elInput.value =
-        "顧客から問い合わせが来たら、まず内容を確認する。" +
-        "技術的な質問なら技術部に転送する。" +
-        "価格の質問なら営業部に転送する。" +
-        "それ以外は総務部に転送する。";
-      setStatus("例文を入力しました。図解を生成を押してください。", "ok");
-    });
-
-    // 初期状態
-    setStatus("準備完了。文章を入力して図解を生成してください。", "ok");
+    // PNGダウンロード機能
+    btnDownloadPNG.onclick = async () => {
+      const target = document.getElementById('previewContainer');
+      const dataUrl = await htmlToImage.toPng(target, { backgroundColor: '#fff' });
+      const link = document.createElement('a');
+      link.download = `flowchart-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    };
   </script>
 </body>
 </html>
